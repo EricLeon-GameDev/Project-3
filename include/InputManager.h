@@ -8,5 +8,5 @@ public:
     LocalInput readInput(bool useTouch = true);
 
 private:
-    bool touchPressedInButtonArea();
+    bool touchPressedAnywhere();
 };

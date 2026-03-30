@@ -31,7 +31,7 @@ struct Scoreboard {
 
 #pragma pack(push, 1)
 struct ClientInputPacket {
-    int16_t paddleDelta;      // -1 up, 0 none, +1 down
+    int16_t paddleDelta;
     bool abilityPressed;
     bool menuSelectPressed;
     bool readyPressed;
@@ -50,9 +50,11 @@ struct GameStatePacket {
     uint8_t rightScore;
     bool leftAbilityArmed;
     bool rightAbilityArmed;
+    bool leftReady;
+    bool rightReady;
     bool connected;
     bool gameOver;
-    uint8_t winner; // 0 none, 1 left, 2 right
+    uint8_t winner;
 };
 #pragma pack(pop)
 

@@ -3,10 +3,9 @@
 #include <NimBLEDevice.h>
 #include "Entities.h"
 
-// Pick ONE role per device build.
-// Comment one out before uploading.
+#ifndef DEVICE_ROLE
 #define DEVICE_ROLE ROLE_HOST
-// #define DEVICE_ROLE ROLE_CLIENT
+#endif
 
 class BleManager {
 public:
@@ -15,12 +14,10 @@ public:
 
     bool isConnected() const;
 
-    // Host-side
     bool hasNewClientInput() const;
     ClientInputPacket getLatestClientInput();
     void sendGameState(const GameStatePacket& state);
 
-    // Client-side
     void sendClientInput(const ClientInputPacket& input);
     bool hasNewGameState() const;
     GameStatePacket getLatestGameState();
@@ -30,13 +27,11 @@ private:
     static constexpr const char* INPUT_CHAR_UUID = "12345678-1234-1234-1234-1234567890ac";
     static constexpr const char* STATE_CHAR_UUID = "12345678-1234-1234-1234-1234567890ad";
 
-    // Host/server
     NimBLEServer* pServer = nullptr;
     NimBLEService* pService = nullptr;
     NimBLECharacteristic* pInputChar = nullptr;
     NimBLECharacteristic* pStateChar = nullptr;
 
-    // Client
     NimBLEClient* pClient = nullptr;
     NimBLERemoteService* pRemoteService = nullptr;
     NimBLERemoteCharacteristic* pRemoteInputChar = nullptr;
@@ -53,12 +48,11 @@ private:
     void beginClient();
     void tryConnectClient();
 
-    // callbacks
     class ServerCallbacks : public NimBLEServerCallbacks {
     public:
         explicit ServerCallbacks(BleManager* owner) : owner(owner) {}
-        void onConnect(NimBLEServer* pServer) override;
-        void onDisconnect(NimBLEServer* pServer) override;
+        void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override;
+        void onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) override;
     private:
         BleManager* owner;
     };
@@ -66,7 +60,7 @@ private:
     class InputCallbacks : public NimBLECharacteristicCallbacks {
     public:
         explicit InputCallbacks(BleManager* owner) : owner(owner) {}
-        void onWrite(NimBLECharacteristic* pCharacteristic) override;
+        void onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) override;
     private:
         BleManager* owner;
     };

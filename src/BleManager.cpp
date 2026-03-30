@@ -3,18 +3,22 @@
 
 BleManager* BleManager::instance = nullptr;
 
-void BleManager::ServerCallbacks::onConnect(NimBLEServer* pServer) {
+void BleManager::ServerCallbacks::onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) {
     owner->connected = true;
     Serial.println("[BLE] Client connected");
 }
 
-void BleManager::ServerCallbacks::onDisconnect(NimBLEServer* pServer) {
+void BleManager::ServerCallbacks::onDisconnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo, int reason) {
     owner->connected = false;
-    Serial.println("[BLE] Client disconnected");
-    NimBLEDevice::startAdvertising();
+    Serial.printf("[BLE] Client disconnected, reason=%d\n", reason);
+
+    NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+    if (advertising) {
+        advertising->start();
+    }
 }
 
-void BleManager::InputCallbacks::onWrite(NimBLECharacteristic* pCharacteristic) {
+void BleManager::InputCallbacks::onWrite(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo) {
     std::string value = pCharacteristic->getValue();
     if (value.size() == sizeof(ClientInputPacket)) {
         memcpy(&owner->latestClientInput, value.data(), sizeof(ClientInputPacket));
@@ -29,6 +33,7 @@ void BleManager::notifyStateCallback(
     bool isNotify
 ) {
     if (!instance) return;
+
     if (length == sizeof(GameStatePacket)) {
         memcpy(&instance->latestGameState, pData, sizeof(GameStatePacket));
         instance->newGameState = true;
@@ -37,11 +42,12 @@ void BleManager::notifyStateCallback(
 
 void BleManager::begin() {
     instance = this;
-    NimBLEDevice::init("Pong-M5Core2");
 
 #if DEVICE_ROLE == ROLE_HOST
+    NimBLEDevice::init(BLE_HOST_NAME);
     beginHost();
 #else
+    NimBLEDevice::init(BLE_CLIENT_NAME);
     beginClient();
 #endif
 }
@@ -63,13 +69,19 @@ void BleManager::beginHost() {
         NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
     );
 
+    // okay to leave this out in newer NimBLE, but it is harmless if kept
     pService->start();
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->addServiceUUID(SERVICE_UUID);
+
+    // Make the Bluetooth name visible
+    advertising->enableScanResponse(true);
+    advertising->setName(BLE_HOST_NAME);
+
     advertising->start();
 
-    Serial.println("[BLE] Host advertising");
+    Serial.printf("[BLE] Host advertising as %s\n", BLE_HOST_NAME);
 }
 
 void BleManager::beginClient() {
@@ -79,14 +91,25 @@ void BleManager::beginClient() {
 void BleManager::tryConnectClient() {
     NimBLEScan* scan = NimBLEDevice::getScan();
     scan->setActiveScan(true);
-    NimBLEScanResults results = scan->start(3, false);
+
+    // NimBLE 2.x blocking scan flow
+    NimBLEScanResults results = scan->getResults(3000);
 
     for (int i = 0; i < results.getCount(); i++) {
-        NimBLEAdvertisedDevice d = results.getDevice(i);
-        if (d.isAdvertisingService(NimBLEUUID(SERVICE_UUID))) {
+        const NimBLEAdvertisedDevice* d = results.getDevice(i);
+        if (!d) continue;
+
+        if (d->isAdvertisingService(NimBLEUUID(SERVICE_UUID))) {
             pClient = NimBLEDevice::createClient();
-            if (!pClient->connect(&d)) {
+            if (!pClient) {
+                Serial.println("[BLE] Failed to create client");
+                return;
+            }
+
+            if (!pClient->connect(d)) {
                 Serial.println("[BLE] Client connect failed");
+                NimBLEDevice::deleteClient(pClient);
+                pClient = nullptr;
                 return;
             }
 
@@ -94,6 +117,8 @@ void BleManager::tryConnectClient() {
             if (!pRemoteService) {
                 Serial.println("[BLE] Service not found");
                 pClient->disconnect();
+                NimBLEDevice::deleteClient(pClient);
+                pClient = nullptr;
                 return;
             }
 
@@ -103,6 +128,8 @@ void BleManager::tryConnectClient() {
             if (!pRemoteInputChar || !pRemoteStateChar) {
                 Serial.println("[BLE] Characteristics missing");
                 pClient->disconnect();
+                NimBLEDevice::deleteClient(pClient);
+                pClient = nullptr;
                 return;
             }
 
@@ -111,7 +138,7 @@ void BleManager::tryConnectClient() {
             }
 
             connected = true;
-            Serial.println("[BLE] Client connected to host");
+            Serial.printf("[BLE] Client connected to host %s\n", d->getName().c_str());
             return;
         }
     }

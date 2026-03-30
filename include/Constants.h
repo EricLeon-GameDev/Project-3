@@ -31,8 +31,16 @@ constexpr unsigned long POINT_DELAY_MS = 1000;
 constexpr unsigned long ABILITY_WINDOW_MS = 250;
 constexpr unsigned long ABILITY_COOLDOWN_MS = 1000;
 
-constexpr unsigned long HOST_STATE_SEND_MS = 33;   // ~30 FPS
-constexpr unsigned long CLIENT_INPUT_SEND_MS = 33; // ~30 FPS
+constexpr unsigned long HOST_STATE_SEND_MS = 33;
+constexpr unsigned long CLIENT_INPUT_SEND_MS = 33;
+
+constexpr const char* BLE_HOST_NAME = "M5-Pong-Server";
+constexpr const char* BLE_CLIENT_NAME = "M5-Pong-Client";
+constexpr const char* WIFI_HOST_LABEL = "PongServer";
+constexpr const char* WIFI_CLIENT_LABEL = "PongClient";
+constexpr unsigned long WIFI_RETRY_MS = 10000;
+
+constexpr int TOUCH_MOVE_DEAD_ZONE = 20;
 
 enum GameScreenState : uint8_t {
     MENU = 0,

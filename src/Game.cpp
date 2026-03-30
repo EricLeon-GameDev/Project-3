@@ -17,13 +17,6 @@ void Game::resetForNewMatch() {
     clientReady = false;
 }
 
-void Game::setClientReady(bool ready) { clientReady = ready; }
-void Game::setHostReady(bool ready) { hostReady = ready; }
-bool Game::getHostReady() const { return hostReady; }
-bool Game::getClientReady() const { return clientReady; }
-GameScreenState Game::getScreenState() const { return screenState; }
-uint8_t Game::getWinner() const { return winner; }
-
 void Game::resetBallTowardRight() {
     ball.x = SCREEN_W / 2;
     ball.y = SCREEN_H / 2;
@@ -36,14 +29,6 @@ void Game::resetBallTowardLeft() {
     ball.y = SCREEN_H / 2;
     ball.vx = -abs(BALL_BASE_SPEED_X);
     ball.vy = BALL_BASE_SPEED_Y;
-}
-
-void Game::resetBall(bool towardLeftLoser) {
-    if (towardLeftLoser) {
-        resetBallTowardLeft();
-    } else {
-        resetBallTowardRight();
-    }
 }
 
 void Game::updatePaddle(Paddle& paddle, int16_t delta) {
@@ -89,10 +74,8 @@ void Game::checkPaddleCollision() {
 
         if (!overlap) return;
 
-        // Reverse X
         ball.vx = isLeft ? abs(ball.vx) : -abs(ball.vx);
 
-        // Angle effect based on where the ball hits
         int paddleCenter = p.y + p.height / 2;
         int offset = ball.y - paddleCenter;
         ball.vy = offset / 6;
@@ -101,7 +84,6 @@ void Game::checkPaddleCollision() {
             ball.vy = (random(0, 2) == 0) ? -1 : 1;
         }
 
-        // Ability window
         unsigned long now = millis();
         if (p.abilityArmed && now - p.abilityArmTime <= ABILITY_WINDOW_MS) {
             ball.vx = (int16_t)round(ball.vx * ABILITY_SPEED_MULT);
@@ -115,7 +97,6 @@ void Game::checkPaddleCollision() {
     collidePaddle(leftPaddle, true);
     collidePaddle(rightPaddle, false);
 
-    // Expire ability windows
     unsigned long now = millis();
     if (leftPaddle.abilityArmed && now - leftPaddle.abilityArmTime > ABILITY_WINDOW_MS) {
         leftPaddle.abilityArmed = false;
@@ -144,16 +125,10 @@ void Game::tryLeavePointScored() {
         return;
     }
 
-    // Serve toward the player who was scored on
-    // If leftScore increased, right player was scored on -> serve right
-    // If rightScore increased, left player was scored on -> serve left
-    if (winner == 0) {
-        // Keep previous direction loosely based on score parity
-        if (score.leftScore > score.rightScore) {
-            resetBallTowardRight();
-        } else {
-            resetBallTowardLeft();
-        }
+    if (score.leftScore > score.rightScore) {
+        resetBallTowardRight();
+    } else {
+        resetBallTowardLeft();
     }
 
     screenState = PLAYING;
@@ -162,14 +137,14 @@ void Game::tryLeavePointScored() {
 void Game::checkScoring() {
     if (ball.x + ball.radius < GOAL_LINE_LEFT_X) {
         score.rightScore++;
-        resetBallTowardLeft(); // next serve toward left player who got scored on
+        resetBallTowardLeft();
         enterPointScored();
         return;
     }
 
     if (ball.x - ball.radius > GOAL_LINE_RIGHT_X) {
         score.leftScore++;
-        resetBallTowardRight(); // next serve toward right player who got scored on
+        resetBallTowardRight();
         enterPointScored();
         return;
     }
@@ -252,6 +227,8 @@ GameStatePacket Game::getStatePacket(bool connected) const {
     p.rightScore = score.rightScore;
     p.leftAbilityArmed = leftPaddle.abilityArmed;
     p.rightAbilityArmed = rightPaddle.abilityArmed;
+    p.leftReady = hostReady;
+    p.rightReady = clientReady;
     p.connected = connected;
     p.gameOver = (screenState == GAME_OVER);
     p.winner = winner;

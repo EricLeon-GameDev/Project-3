@@ -23,24 +23,19 @@ void Renderer::drawThreeDigitScore(int x, int y, uint8_t score, uint16_t color) 
 void Renderer::drawField(const GameStatePacket& state) {
     M5.Lcd.fillScreen(COLOR_BG);
 
-    // Net
     for (int y = 0; y < SCREEN_H; y += 12) {
         M5.Lcd.fillRect(SCREEN_W / 2 - 1, y, 2, 6, COLOR_NET);
     }
 
-    // Goal lines
     M5.Lcd.drawFastVLine(GOAL_LINE_LEFT_X, 0, SCREEN_H, COLOR_GOAL);
     M5.Lcd.drawFastVLine(GOAL_LINE_RIGHT_X, 0, SCREEN_H, COLOR_GOAL);
 
-    // Scores
     drawThreeDigitScore(20, 10, state.leftScore, COLOR_LEFT);
     drawThreeDigitScore(SCREEN_W - 60, 10, state.rightScore, COLOR_RIGHT);
 
-    // Paddles
     M5.Lcd.fillRect(20, state.leftPaddleY, PADDLE_W, PADDLE_H, COLOR_LEFT);
     M5.Lcd.fillRect(SCREEN_W - 20 - PADDLE_W, state.rightPaddleY, PADDLE_W, PADDLE_H, COLOR_RIGHT);
 
-    // Ability indicators
     if (state.leftAbilityArmed) {
         M5.Lcd.drawRect(18, state.leftPaddleY - 2, PADDLE_W + 4, PADDLE_H + 4, YELLOW);
     }
@@ -48,7 +43,6 @@ void Renderer::drawField(const GameStatePacket& state) {
         M5.Lcd.drawRect(SCREEN_W - 22 - PADDLE_W, state.rightPaddleY - 2, PADDLE_W + 4, PADDLE_H + 4, YELLOW);
     }
 
-    // Ball
     M5.Lcd.fillCircle(state.ballX, state.ballY, BALL_RADIUS, COLOR_BALL);
 }
 
@@ -57,11 +51,13 @@ void Renderer::drawMenu() {
     drawCenteredText("PONG", 40, WHITE, 3);
     drawCenteredText("Touch or BtnC", 100, WHITE, 2);
     drawCenteredText("to Start", 130, WHITE, 2);
+    drawCenteredText("Touch upper/lower screen", 180, WHITE, 1);
+    drawCenteredText("or use BtnA/BtnB to move", 200, WHITE, 1);
 }
 
 void Renderer::drawWaitingForConnection(bool isHost, bool connected) {
     M5.Lcd.fillScreen(COLOR_BG);
-    drawCenteredText(isHost ? "HOST MODE" : "CLIENT MODE", 40, WHITE, 2);
+    drawCenteredText(isHost ? "SERVER / HOST" : "CLIENT", 40, WHITE, 2);
     drawCenteredText(connected ? "Connected" : "Waiting for player...", 100, connected ? GREEN : WHITE, 2);
 }
 
@@ -102,10 +98,12 @@ void Renderer::draw(const GameStatePacket& state, bool isHost, bool isConnected)
         case WAITING_FOR_CONNECTION:
             drawWaitingForConnection(isHost, isConnected);
             break;
-        case WAITING_FOR_READY:
-            drawField(state);
-            drawCenteredText("Waiting for Ready", 210, WHITE, 2);
+        case WAITING_FOR_READY: {
+            bool localReady = isHost ? state.leftReady : state.rightReady;
+            bool remoteReady = isHost ? state.rightReady : state.leftReady;
+            drawWaitingForReady(localReady, remoteReady);
             break;
+        }
         case PLAYING:
             drawField(state);
             break;
@@ -113,7 +111,7 @@ void Renderer::draw(const GameStatePacket& state, bool isHost, bool isConnected)
             drawPointScored(state.leftScore, state.rightScore);
             break;
         case GAME_OVER:
-            drawGameOver(state.winner, isHost); // host = left player
+            drawGameOver(state.winner, isHost);
             break;
         default:
             drawMenu();
